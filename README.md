@@ -1,14 +1,81 @@
-# entro-go
+<div align="center">
+  <img src="https://raw.githubusercontent.com/entrolytics/.github/main/media/entrov2.png" alt="Entrolytics" width="64" height="64">
 
-Go SDK for [Entrolytics](https://ng.entrolytics.click) - First-party growth analytics for the edge.
+  [![Go Reference](https://pkg.go.dev/badge/github.com/entrolytics/go.svg)](https://pkg.go.dev/github.com/entrolytics/go)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+  [![Go](https://img.shields.io/badge/Go-1.21+-00ADD8.svg?logo=go&logoColor=white)](https://go.dev/)
+
+</div>
+
+---
+
+## Overview
+
+**github.com/entrolytics/go** is the official Go SDK for Entrolytics - first-party growth analytics for the edge. Track events server-side from any Go application.
+
+**Why use this SDK?**
+- Native Go client with context support
+- Middleware for Gin, Echo, and net/http
+- Intelligent routing to optimal collection endpoints
+- Comprehensive error handling with typed errors
+
+## Key Features
+
+<table>
+<tr>
+<td width="50%">
+
+### Analytics
+- Custom event tracking
+- Page view tracking
+- User identification
+- Context cancellation support
+
+</td>
+<td width="50%">
+
+### Framework Integrations
+- net/http middleware
+- Gin middleware
+- Echo middleware
+- Typed error handling
+
+</td>
+</tr>
+</table>
+
+## Quick Start
+
+<table>
+<tr>
+<td align="center" width="25%">
+<img src="https://api.iconify.design/lucide:download.svg?color=%236366f1" width="48"><br>
+<strong>1. Install</strong><br>
+<code>go get github.com/entrolytics/go</code>
+</td>
+<td align="center" width="25%">
+<img src="https://api.iconify.design/lucide:code.svg?color=%236366f1" width="48"><br>
+<strong>2. Create Client</strong><br>
+<code>NewClient(apiKey)</code>
+</td>
+<td align="center" width="25%">
+<img src="https://api.iconify.design/lucide:settings.svg?color=%236366f1" width="48"><br>
+<strong>3. Configure</strong><br>
+Set API key and Website ID
+</td>
+<td align="center" width="25%">
+<img src="https://api.iconify.design/lucide:bar-chart-3.svg?color=%236366f1" width="48"><br>
+<strong>4. Track</strong><br>
+View analytics in dashboard
+</td>
+</tr>
+</table>
 
 ## Installation
 
 ```bash
-go get github.com/entrolytics/entro-go
+go get github.com/entrolytics/go
 ```
-
-## Quick Start
 
 ```go
 package main
@@ -16,7 +83,7 @@ package main
 import (
     "log"
 
-    entrolytics "github.com/entrolytics/entro-go"
+    entrolytics "github.com/entrolytics/go"
 )
 
 func main() {
