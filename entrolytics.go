@@ -53,7 +53,7 @@ const (
 	DefaultTimeout = 10 * time.Second
 
 	// Version is the SDK version.
-	Version = "0.1.0"
+	Version = "2.1.0"
 )
 
 // Client is the Entrolytics API client.
@@ -214,11 +214,11 @@ func (c *Client) IdentifyWithContext(ctx context.Context, id Identify) error {
 }
 
 // ============================================================================
-// Phase 2: Web Vitals (requires entrolytics-ng)
+// Phase 2: Web Vitals (requires entrolytics)
 // ============================================================================
 
 // TrackVital sends a Web Vital metric to Entrolytics.
-// Note: This feature requires entrolytics-ng.
+// Note: This feature requires entrolytics.
 func (c *Client) TrackVital(vital WebVital) error {
 	return c.TrackVitalWithContext(context.Background(), vital)
 }
@@ -256,11 +256,11 @@ func (c *Client) TrackVitalWithContext(ctx context.Context, vital WebVital) erro
 }
 
 // ============================================================================
-// Phase 2: Form Analytics (requires entrolytics-ng)
+// Phase 2: Form Analytics (requires entrolytics)
 // ============================================================================
 
 // TrackFormEvent sends a form interaction event to Entrolytics.
-// Note: This feature requires entrolytics-ng.
+// Note: This feature requires entrolytics.
 func (c *Client) TrackFormEvent(event FormEvent) error {
 	return c.TrackFormEventWithContext(context.Background(), event)
 }
@@ -303,11 +303,11 @@ func (c *Client) TrackFormEventWithContext(ctx context.Context, event FormEvent)
 }
 
 // ============================================================================
-// Phase 2: Deployment Tracking (requires entrolytics-ng)
+// Phase 2: Deployment Tracking (requires entrolytics)
 // ============================================================================
 
 // SetDeployment registers deployment context with Entrolytics.
-// Note: This feature requires entrolytics-ng.
+// Note: This feature requires entrolytics.
 func (c *Client) SetDeployment(deploy Deployment) error {
 	return c.SetDeploymentWithContext(context.Background(), deploy)
 }
@@ -406,7 +406,11 @@ func (c *Client) handleResponse(resp *http.Response) error {
 	case http.StatusTooManyRequests:
 		retryAfter := 0
 		if ra := resp.Header.Get("Retry-After"); ra != "" {
-			retryAfter, _ = strconv.Atoi(ra)
+			var err error
+			retryAfter, err = strconv.Atoi(ra)
+			if err != nil {
+				retryAfter = 0
+			}
 		}
 		return &RateLimitError{RetryAfter: retryAfter}
 

@@ -201,7 +201,7 @@ client := entrolytics.NewClient("ent_xxx")
 // Use edge endpoint for sub-50ms latency
 client := entrolytics.NewClientWithOptions(entrolytics.ClientOptions{
     APIKey:   "ent_xxx",
-    Host:     "https://ng.entrolytics.click",
+    Host:     "https://entrolytics.click",
     Endpoint: "/api/send-native",
 })
 ```
@@ -212,7 +212,7 @@ client := entrolytics.NewClientWithOptions(entrolytics.ClientOptions{
 // Use Node.js endpoint for ClickHouse export and MaxMind GeoIP
 client := entrolytics.NewClientWithOptions(entrolytics.ClientOptions{
     APIKey:   "ent_xxx",
-    Host:     "https://ng.entrolytics.click",
+    Host:     "https://entrolytics.click",
     Endpoint: "/api/send",
 })
 ```
@@ -229,7 +229,7 @@ client := entrolytics.NewClientWithOptions(entrolytics.ClientOptions{
 })
 ```
 
-See the [Routing documentation](https://ng.entrolytics.click/docs/concepts/routing) for more details.
+See the [Routing documentation](https://entrolytics.click/docs/concepts/routing) for more details.
 
 ## Context Support
 

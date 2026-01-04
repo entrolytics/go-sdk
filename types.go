@@ -171,7 +171,7 @@ const (
 )
 
 // WebVital represents a Web Vital metric to track.
-// Note: Web Vitals tracking requires entrolytics-ng.
+// Note: Web Vitals tracking requires entrolytics.
 type WebVital struct {
 	// WebsiteID is your Entrolytics website ID (required).
 	WebsiteID string
@@ -247,7 +247,7 @@ const (
 )
 
 // FormEvent represents a form interaction event to track.
-// Note: Form tracking requires entrolytics-ng.
+// Note: Form tracking requires entrolytics.
 type FormEvent struct {
 	// WebsiteID is your Entrolytics website ID (required).
 	WebsiteID string
@@ -330,7 +330,7 @@ const (
 )
 
 // Deployment represents deployment context to register.
-// Note: Deployment tracking requires entrolytics-ng.
+// Note: Deployment tracking requires entrolytics.
 type Deployment struct {
 	// WebsiteID is your Entrolytics website ID (required).
 	WebsiteID string
