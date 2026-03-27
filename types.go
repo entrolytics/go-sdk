@@ -25,6 +25,9 @@ type Event struct {
 	// SessionID identifies the user session.
 	SessionID string
 
+	// VisitorID identifies the visitor across sessions.
+	VisitorID string
+
 	// UserAgent is the client's user agent string.
 	UserAgent string
 
@@ -55,6 +58,9 @@ type PageView struct {
 	// SessionID identifies the user session.
 	SessionID string
 
+	// VisitorID identifies the visitor across sessions.
+	VisitorID string
+
 	// UserAgent is the client's user agent string.
 	UserAgent string
 
@@ -75,6 +81,12 @@ type Identify struct {
 
 	// Traits are user attributes like email, plan, company.
 	Traits map[string]interface{}
+
+	// SessionID identifies the user session.
+	SessionID string
+
+	// VisitorID identifies the visitor across sessions.
+	VisitorID string
 
 	// Timestamp is when the identification occurred.
 	Timestamp time.Time
@@ -102,28 +114,16 @@ type ClientOptions struct {
 	UserAgent string
 }
 
-// eventPayload is the internal structure for sending events.
-type eventPayload struct {
-	Type    string      `json:"type"`
-	Payload interface{} `json:"payload"`
-}
-
-type trackPayload struct {
-	Website   string                 `json:"website"`
-	Name      string                 `json:"name"`
-	Data      map[string]interface{} `json:"data,omitempty"`
-	URL       string                 `json:"url,omitempty"`
-	Referrer  string                 `json:"referrer,omitempty"`
-	UserID    string                 `json:"userId,omitempty"`
-	SessionID string                 `json:"sessionId,omitempty"`
-	Timestamp string                 `json:"timestamp"`
-}
-
-type identifyPayload struct {
-	Website   string                 `json:"website"`
-	UserID    string                 `json:"userId"`
-	Traits    map[string]interface{} `json:"traits,omitempty"`
-	Timestamp string                 `json:"timestamp"`
+// collectPayload is the canonical payload for /collect ingestion.
+type collectPayload struct {
+	WebsiteID  string                 `json:"websiteId"`
+	SessionID  string                 `json:"sessionId"`
+	VisitorID  string                 `json:"visitorId"`
+	URL        string                 `json:"url"`
+	EventType  string                 `json:"eventType"`
+	EventName  string                 `json:"eventName,omitempty"`
+	Referrer   string                 `json:"referrer,omitempty"`
+	Properties map[string]interface{} `json:"properties,omitempty"`
 }
 
 // ============================================================================
@@ -206,22 +206,23 @@ type WebVital struct {
 	// SessionID identifies the user session.
 	SessionID string
 
+	// VisitorID identifies the visitor across sessions.
+	VisitorID string
+
 	// Timestamp is when the metric was recorded.
 	Timestamp time.Time
 }
 
 type vitalPayload struct {
-	Website        string                 `json:"website"`
-	Metric         VitalMetric            `json:"metric"`
-	Value          float64                `json:"value"`
-	Rating         VitalRating            `json:"rating"`
-	Delta          float64                `json:"delta,omitempty"`
-	ID             string                 `json:"id,omitempty"`
-	NavigationType NavigationType         `json:"navigationType,omitempty"`
-	Attribution    map[string]interface{} `json:"attribution,omitempty"`
-	URL            string                 `json:"url,omitempty"`
-	Path           string                 `json:"path,omitempty"`
-	SessionID      string                 `json:"sessionId,omitempty"`
+	WebsiteID   string      `json:"websiteId"`
+	VisitorID   string      `json:"visitorId"`
+	SessionID   string      `json:"sessionId"`
+	URL         string      `json:"url"`
+	Path        string      `json:"path"`
+	MetricName  VitalMetric `json:"metricName"`
+	MetricValue float64     `json:"metricValue"`
+	DeviceType  string      `json:"deviceType,omitempty"`
+	Browser     string      `json:"browser,omitempty"`
 }
 
 // ============================================================================
@@ -288,12 +289,17 @@ type FormEvent struct {
 	// SessionID identifies the user session.
 	SessionID string
 
+	// VisitorID identifies the visitor across sessions.
+	VisitorID string
+
 	// Timestamp is when the event occurred.
 	Timestamp time.Time
 }
 
 type formEventPayload struct {
-	Website        string        `json:"website"`
+	WebsiteID      string        `json:"websiteId"`
+	VisitorID      string        `json:"visitorId"`
+	SessionID      string        `json:"sessionId"`
 	EventType      FormEventType `json:"eventType"`
 	FormID         string        `json:"formId"`
 	FormName       string        `json:"formName,omitempty"`
@@ -305,7 +311,6 @@ type formEventPayload struct {
 	TimeSinceStart int           `json:"timeSinceStart,omitempty"`
 	ErrorMessage   string        `json:"errorMessage,omitempty"`
 	Success        bool          `json:"success,omitempty"`
-	SessionID      string        `json:"sessionId,omitempty"`
 }
 
 // ============================================================================

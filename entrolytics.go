@@ -37,11 +37,13 @@ package entrolytics
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -112,23 +114,33 @@ func (c *Client) TrackWithContext(ctx context.Context, event Event) error {
 		return ErrEventNameRequired
 	}
 
-	timestamp := event.Timestamp
-	if timestamp.IsZero() {
-		timestamp = time.Now().UTC()
+	sessionID := event.SessionID
+	if sessionID == "" {
+		sessionID = generateUUID()
 	}
 
-	payload := eventPayload{
-		Type: "event",
-		Payload: trackPayload{
-			Website:   event.WebsiteID,
-			Name:      event.Name,
-			Data:      event.Data,
-			URL:       event.URL,
-			Referrer:  event.Referrer,
-			UserID:    event.UserID,
-			SessionID: event.SessionID,
-			Timestamp: timestamp.Format(time.RFC3339),
-		},
+	visitorID := event.VisitorID
+	if visitorID == "" {
+		visitorID = generateUUID()
+	}
+
+	properties := map[string]interface{}{}
+	for key, value := range event.Data {
+		properties[key] = value
+	}
+	if event.UserID != "" {
+		properties["distinctId"] = event.UserID
+	}
+
+	payload := collectPayload{
+		WebsiteID:  event.WebsiteID,
+		SessionID:  sessionID,
+		VisitorID:  visitorID,
+		URL:        normalizeURL(c.host, event.URL),
+		EventType:  "custom_event",
+		EventName:  event.Name,
+		Referrer:   normalizeReferrer(event.Referrer),
+		Properties: properties,
 	}
 
 	return c.send(ctx, payload, event.UserAgent, event.IPAddress)
@@ -151,28 +163,32 @@ func (c *Client) PageViewWithContext(ctx context.Context, pv PageView) error {
 		return ErrURLRequired
 	}
 
-	timestamp := pv.Timestamp
-	if timestamp.IsZero() {
-		timestamp = time.Now().UTC()
+	sessionID := pv.SessionID
+	if sessionID == "" {
+		sessionID = generateUUID()
 	}
 
-	data := make(map[string]interface{})
+	visitorID := pv.VisitorID
+	if visitorID == "" {
+		visitorID = generateUUID()
+	}
+
+	properties := map[string]interface{}{}
 	if pv.Title != "" {
-		data["title"] = pv.Title
+		properties["title"] = pv.Title
+	}
+	if pv.UserID != "" {
+		properties["distinctId"] = pv.UserID
 	}
 
-	payload := eventPayload{
-		Type: "event",
-		Payload: trackPayload{
-			Website:   pv.WebsiteID,
-			Name:      "$pageview",
-			Data:      data,
-			URL:       pv.URL,
-			Referrer:  pv.Referrer,
-			UserID:    pv.UserID,
-			SessionID: pv.SessionID,
-			Timestamp: timestamp.Format(time.RFC3339),
-		},
+	payload := collectPayload{
+		WebsiteID:  pv.WebsiteID,
+		SessionID:  sessionID,
+		VisitorID:  visitorID,
+		URL:        normalizeURL(c.host, pv.URL),
+		EventType:  "pageview",
+		Referrer:   normalizeReferrer(pv.Referrer),
+		Properties: properties,
 	}
 
 	return c.send(ctx, payload, pv.UserAgent, pv.IPAddress)
@@ -195,19 +211,31 @@ func (c *Client) IdentifyWithContext(ctx context.Context, id Identify) error {
 		return ErrUserIDRequired
 	}
 
-	timestamp := id.Timestamp
-	if timestamp.IsZero() {
-		timestamp = time.Now().UTC()
+	sessionID := id.SessionID
+	if sessionID == "" {
+		sessionID = generateUUID()
 	}
 
-	payload := eventPayload{
-		Type: "identify",
-		Payload: identifyPayload{
-			Website:   id.WebsiteID,
-			UserID:    id.UserID,
-			Traits:    id.Traits,
-			Timestamp: timestamp.Format(time.RFC3339),
-		},
+	visitorID := id.VisitorID
+	if visitorID == "" {
+		visitorID = generateUUID()
+	}
+
+	properties := map[string]interface{}{}
+	for key, value := range id.Traits {
+		properties[key] = value
+	}
+	properties["distinctId"] = id.UserID
+	properties["identify"] = true
+
+	payload := collectPayload{
+		WebsiteID:  id.WebsiteID,
+		SessionID:  sessionID,
+		VisitorID:  visitorID,
+		URL:        normalizeURL(c.host, "/identify"),
+		EventType:  "custom_event",
+		EventName:  "identify",
+		Properties: properties,
 	}
 
 	return c.send(ctx, payload, "", "")
@@ -239,17 +267,13 @@ func (c *Client) TrackVitalWithContext(ctx context.Context, vital WebVital) erro
 	}
 
 	payload := vitalPayload{
-		Website:        vital.WebsiteID,
-		Metric:         vital.Metric,
-		Value:          vital.Value,
-		Rating:         vital.Rating,
-		Delta:          vital.Delta,
-		ID:             vital.ID,
-		NavigationType: vital.NavigationType,
-		Attribution:    vital.Attribution,
-		URL:            vital.URL,
-		Path:           vital.Path,
-		SessionID:      vital.SessionID,
+		WebsiteID:   vital.WebsiteID,
+		VisitorID:   firstNonEmpty(vital.VisitorID, generateUUID()),
+		SessionID:   firstNonEmpty(vital.SessionID, generateUUID()),
+		URL:         normalizeURL(c.host, firstNonEmpty(vital.URL, "/vital")),
+		Path:        firstNonEmpty(vital.Path, "/vital"),
+		MetricName:  vital.Metric,
+		MetricValue: vital.Value,
 	}
 
 	return c.sendToEndpoint(ctx, "/api/collect/vitals", payload, "", "")
@@ -284,7 +308,9 @@ func (c *Client) TrackFormEventWithContext(ctx context.Context, event FormEvent)
 	}
 
 	payload := formEventPayload{
-		Website:        event.WebsiteID,
+		WebsiteID:      event.WebsiteID,
+		VisitorID:      firstNonEmpty(event.VisitorID, generateUUID()),
+		SessionID:      firstNonEmpty(event.SessionID, generateUUID()),
 		EventType:      event.EventType,
 		FormID:         event.FormID,
 		FormName:       event.FormName,
@@ -296,7 +322,6 @@ func (c *Client) TrackFormEventWithContext(ctx context.Context, event FormEvent)
 		TimeSinceStart: event.TimeSinceStart,
 		ErrorMessage:   event.ErrorMessage,
 		Success:        event.Success,
-		SessionID:      event.SessionID,
 	}
 
 	return c.sendToEndpoint(ctx, "/api/collect/forms", payload, "", "")
@@ -336,9 +361,59 @@ func (c *Client) SetDeploymentWithContext(ctx context.Context, deploy Deployment
 	return c.sendToEndpoint(ctx, fmt.Sprintf("/api/websites/%s/deployments", deploy.WebsiteID), payload, "", "")
 }
 
+func firstNonEmpty(value, fallback string) string {
+	if value != "" {
+		return value
+	}
+	return fallback
+}
+
+func generateUUID() string {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return fmt.Sprintf("00000000-0000-4000-8000-%012x", time.Now().UnixNano()&0xFFFFFFFFFFFF)
+	}
+
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
+
+	return fmt.Sprintf(
+		"%08x-%04x-%04x-%04x-%04x%08x",
+		b[0:4],
+		b[4:6],
+		b[6:8],
+		b[8:10],
+		b[10:12],
+		b[12:16],
+	)
+}
+
+func normalizeURL(host, rawURL string) string {
+	if rawURL == "" {
+		rawURL = "/event"
+	}
+	if strings.HasPrefix(rawURL, "http://") || strings.HasPrefix(rawURL, "https://") {
+		return rawURL
+	}
+
+	if !strings.HasPrefix(rawURL, "/") {
+		rawURL = "/" + rawURL
+	}
+
+	return strings.TrimRight(host, "/") + rawURL
+}
+
+func normalizeReferrer(rawReferrer string) string {
+	if strings.HasPrefix(rawReferrer, "http://") || strings.HasPrefix(rawReferrer, "https://") {
+		return rawReferrer
+	}
+
+	return ""
+}
+
 // send performs the HTTP request to the Entrolytics API.
 func (c *Client) send(ctx context.Context, payload interface{}, userAgent, ipAddress string) error {
-	return c.sendToEndpoint(ctx, "/api/send", payload, userAgent, ipAddress)
+	return c.sendToEndpoint(ctx, "/collect", payload, userAgent, ipAddress)
 }
 
 // sendToEndpoint performs the HTTP request to a specific endpoint.
@@ -354,7 +429,7 @@ func (c *Client) sendToEndpoint(ctx context.Context, endpoint string, payload in
 		return &NetworkError{Message: "failed to create request", Err: err}
 	}
 
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.apiKey))
+	req.Header.Set("x-api-key", c.apiKey)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", c.userAgent)
 
@@ -376,7 +451,7 @@ func (c *Client) sendToEndpoint(ctx context.Context, endpoint string, payload in
 
 // handleResponse processes the API response.
 func (c *Client) handleResponse(resp *http.Response) error {
-	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated {
+	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusAccepted {
 		return nil
 	}
 

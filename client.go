@@ -117,9 +117,9 @@ func (c *Client) Page(name string, properties map[string]interface{}) error {
 	if properties == nil {
 		properties = make(map[string]interface{})
 	}
-	
+
 	properties["page_name"] = name
-	
+
 	return c.Track(Event{
 		Event:      "page",
 		Properties: properties,

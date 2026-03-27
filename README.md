@@ -1,9 +1,9 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/entrolytics/.github/main/media/entrov2.png" alt="Entrolytics" width="64" height="64">
+- <img src="https://raw.githubusercontent.com/entrolytics/.github/main/media/entrov2.png" alt="Entrolytics" width="64" height="64">
 
-  [![Go Reference](https://pkg.go.dev/badge/github.com/entrolytics/go.svg)](https://pkg.go.dev/github.com/entrolytics/go)
-  [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
-  [![Go](https://img.shields.io/badge/Go-1.21+-00ADD8.svg?logo=go&logoColor=white)](https://go.dev/)
+- [![Go Reference](https://pkg.go.dev/badge/github.com/entrolytics/go.svg)](https://pkg.go.dev/github.com/entrolytics/go)
+- [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+- [![Go](https://img.shields.io/badge/Go-1.21+-00ADD8.svg?logo=go\&logoColor=white)](https://go.dev/)
 
 </div>
 
@@ -14,6 +14,7 @@
 **github.com/entrolytics/go** is the official Go SDK for Entrolytics - first-party growth analytics for the edge. Track events server-side from any Go application.
 
 **Why use this SDK?**
+
 - Native Go client with context support
 - Middleware for Gin, Echo, and net/http
 - Intelligent routing to optimal collection endpoints
@@ -26,6 +27,7 @@
 <td width="50%">
 
 ### Analytics
+
 - Custom event tracking
 - Page view tracking
 - User identification
@@ -35,6 +37,7 @@
 <td width="50%">
 
 ### Framework Integrations
+
 - net/http middleware
 - Gin middleware
 - Echo middleware
@@ -133,87 +136,42 @@ func main() {
 
 ## Collection Endpoints
 
-Entrolytics provides three collection endpoints optimized for different use cases:
+This SDK uses the canonical Entrolytics ingestion contract:
 
-### `/api/collect` - Intelligent Routing (Recommended)
+### `/collect` - Event Ingestion (Default)
 
-The default endpoint that automatically routes to the optimal storage backend based on your plan and website settings.
-
-**Features:**
-- Automatic optimization (Free/Pro → Edge, Business/Enterprise → Node.js)
-- Zero configuration required
-- Best balance of performance and features
-
-**Use when:**
-- You want automatic optimization based on your plan
-- You're using Entrolytics Cloud
-- You don't have specific latency or feature requirements
-
-### `/api/send-native` - Edge Runtime (Fastest)
-
-Direct edge endpoint for sub-50ms global latency.
+Used by `Track`, `PageView`, and `Identify`.
 
 **Features:**
-- Sub-50ms response times globally
-- Runs on Vercel Edge Runtime
-- Upstash Redis + Neon Serverless
-- Best for high-traffic applications
 
-**Limitations:**
-- No ClickHouse export
-- Basic geo data (country-level)
+- Canonical event payload (`websiteId`, `sessionId`, `visitorId`, `eventType`, etc.)
+- API-key authenticated via `x-api-key`
+- Works across Entrolytics Cloud and self-hosted deployments
 
-**Use when:**
-- Latency is critical (<50ms required)
-- You have high request volume
-- You don't need ClickHouse export
+### `/collect/batch` - Batch Ingestion
 
-### `/api/send` - Node.js Runtime (Full-Featured)
+Available in the lightweight batch client (`client.go`) for high-volume event submission.
 
-Traditional Node.js endpoint with advanced capabilities.
+### `/api/collect/vitals` and `/api/collect/forms` - Phase 2 Telemetry
 
-**Features:**
-- ClickHouse export support
-- MaxMind GeoIP (city-level accuracy)
-- PostgreSQL storage
-- Advanced analytics features
-
-**Latency:** 50-150ms (regional)
-
-**Use when:**
-- Self-hosted deployments without edge support
-- You need ClickHouse data export
-- You require city-level geo accuracy
-- Custom server-side analytics workflows
+Used by Web Vitals and Form Analytics helpers when those features are enabled in your Entrolytics backend.
 
 ## Configuration
 
 ### Default (Intelligent Routing)
 
 ```go
-// Uses /api/collect by default
+// Uses /collect by default
 client := entrolytics.NewClient("ent_xxx")
 ```
 
-### Edge Runtime Endpoint
+### Custom Host
 
 ```go
-// Use edge endpoint for sub-50ms latency
+// Point to a custom Entrolytics host (cloud or self-hosted)
 client := entrolytics.NewClientWithOptions(entrolytics.ClientOptions{
-    APIKey:   "ent_xxx",
-    Host:     "https://entrolytics.click",
-    Endpoint: "/api/send-native",
-})
-```
-
-### Node.js Runtime Endpoint
-
-```go
-// Use Node.js endpoint for ClickHouse export and MaxMind GeoIP
-client := entrolytics.NewClientWithOptions(entrolytics.ClientOptions{
-    APIKey:   "ent_xxx",
-    Host:     "https://entrolytics.click",
-    Endpoint: "/api/send",
+    APIKey: "ent_xxx",
+    Host:   "https://analytics.yourdomain.com",
 })
 ```
 
@@ -408,20 +366,20 @@ client.Identify(entrolytics.Identify{
 
 ### Types
 
-| Type | Required Fields | Optional Fields |
-|------|-----------------|-----------------|
-| `Event` | WebsiteID, Name | Data, URL, Referrer, UserID, SessionID, UserAgent, IPAddress, Timestamp |
-| `PageView` | WebsiteID, URL | Referrer, Title, UserID, SessionID, UserAgent, IPAddress, Timestamp |
-| `Identify` | WebsiteID, UserID | Traits, Timestamp |
+| Type       | Required Fields   | Optional Fields                                                         |
+| ---------- | ----------------- | ----------------------------------------------------------------------- |
+| `Event`    | WebsiteID, Name   | Data, URL, Referrer, UserID, SessionID, UserAgent, IPAddress, Timestamp |
+| `PageView` | WebsiteID, URL    | Referrer, Title, UserID, SessionID, UserAgent, IPAddress, Timestamp     |
+| `Identify` | WebsiteID, UserID | Traits, Timestamp                                                       |
 
 ### Errors
 
-| Error Type | Description |
-|------------|-------------|
-| `EntrolyticsError` | Base error type |
-| `AuthenticationError` | Invalid API key |
-| `RateLimitError` | Rate limit exceeded |
-| `NetworkError` | Network request failed |
+| Error Type            | Description            |
+| --------------------- | ---------------------- |
+| `EntrolyticsError`    | Base error type        |
+| `AuthenticationError` | Invalid API key        |
+| `RateLimitError`      | Rate limit exceeded    |
+| `NetworkError`        | Network request failed |
 
 ## License
 

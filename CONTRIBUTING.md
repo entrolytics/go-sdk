@@ -20,24 +20,33 @@ Please read the main [Contributing Guide](../CONTRIBUTING.md) in the root of thi
 ```
 entro-go/
 ├── src/          # Source code
+
 ├── dist/         # Built output (generated)
+
 ├── package.json  # Package manifest
+
 └── README.md     # Package documentation
+
 ```
 
 ### Development Commands
 
 ```bash
+
 # Download dependencies
+
 go mod download
 
 # Build
+
 go build ./...
 
 # Run tests
+
 go test ./...
 
 # Vet the code
+
 go vet ./...
 ```
 
