@@ -3,7 +3,7 @@
 
 - [![Go Reference](https://pkg.go.dev/badge/github.com/entrolytics/go.svg)](https://pkg.go.dev/github.com/entrolytics/go)
 - [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
-- [![Go](https://img.shields.io/badge/Go-1.21+-00ADD8.svg?logo=go\&logoColor=white)](https://go.dev/)
+- [![Go](https://img.shields.io/badge/Go-1.26.5+-00ADD8.svg?logo=go\&logoColor=white)](https://go.dev/)
 
 </div>
 

@@ -104,7 +104,7 @@ type ClientOptions struct {
 	// APIKey is your Entrolytics API key (required).
 	APIKey string
 
-	// Host is the Entrolytics API host. Defaults to https://entrolytics.click.
+	// Host is the Entrolytics API host. Defaults to https://api.entrolytics.click.
 	Host string
 
 	// Timeout is the HTTP request timeout. Defaults to 10 seconds.
@@ -117,6 +117,8 @@ type ClientOptions struct {
 // collectPayload is the canonical payload for /collect ingestion.
 type collectPayload struct {
 	WebsiteID  string                 `json:"websiteId"`
+	EventID    string                 `json:"eventId"`
+	Timestamp  string                 `json:"timestamp"`
 	SessionID  string                 `json:"sessionId"`
 	VisitorID  string                 `json:"visitorId"`
 	URL        string                 `json:"url"`

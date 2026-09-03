@@ -49,7 +49,7 @@ import (
 
 const (
 	// DefaultHost is the default Entrolytics API host.
-	DefaultHost = "https://entrolytics.click"
+	DefaultHost = "https://api.entrolytics.click"
 
 	// DefaultTimeout is the default HTTP request timeout.
 	DefaultTimeout = 10 * time.Second
@@ -134,6 +134,8 @@ func (c *Client) TrackWithContext(ctx context.Context, event Event) error {
 
 	payload := collectPayload{
 		WebsiteID:  event.WebsiteID,
+		EventID:    generateUUID(),
+		Timestamp:  eventTime(event.Timestamp),
 		SessionID:  sessionID,
 		VisitorID:  visitorID,
 		URL:        normalizeURL(c.host, event.URL),
@@ -183,6 +185,8 @@ func (c *Client) PageViewWithContext(ctx context.Context, pv PageView) error {
 
 	payload := collectPayload{
 		WebsiteID:  pv.WebsiteID,
+		EventID:    generateUUID(),
+		Timestamp:  eventTime(pv.Timestamp),
 		SessionID:  sessionID,
 		VisitorID:  visitorID,
 		URL:        normalizeURL(c.host, pv.URL),
@@ -230,6 +234,8 @@ func (c *Client) IdentifyWithContext(ctx context.Context, id Identify) error {
 
 	payload := collectPayload{
 		WebsiteID:  id.WebsiteID,
+		EventID:    generateUUID(),
+		Timestamp:  eventTime(id.Timestamp),
 		SessionID:  sessionID,
 		VisitorID:  visitorID,
 		URL:        normalizeURL(c.host, "/identify"),
@@ -366,6 +372,14 @@ func firstNonEmpty(value, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func eventTime(value time.Time) string {
+	if value.IsZero() {
+		value = time.Now()
+	}
+
+	return value.UTC().Format(time.RFC3339Nano)
 }
 
 func generateUUID() string {
