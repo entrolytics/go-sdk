@@ -104,7 +104,7 @@ type ClientOptions struct {
 	// APIKey is your Entrolytics API key (required).
 	APIKey string
 
-	// Host is the Entrolytics API host. Defaults to https://api.entrolytics.click.
+	// Host is the Entrolytics API host. Defaults to https://api.entrolytics.dev.
 	Host string
 
 	// Timeout is the HTTP request timeout. Defaults to 10 seconds.

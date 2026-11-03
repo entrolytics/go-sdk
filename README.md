@@ -188,7 +188,7 @@ client := entrolytics.NewClientWithOptions(entrolytics.ClientOptions{
 })
 ```
 
-See the [Routing documentation](https://entrolytics.click/docs/concepts/routing) for more details.
+See the [Routing documentation](https://entrolytics.dev/docs/concepts/routing) for more details.
 
 ## Context Support
 

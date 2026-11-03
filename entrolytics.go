@@ -51,7 +51,7 @@ import (
 
 const (
 	// DefaultHost is the default Entrolytics API host.
-	DefaultHost = "https://api.entrolytics.click"
+	DefaultHost = "https://api.entrolytics.dev"
 
 	// DefaultTimeout is the default HTTP request timeout.
 	DefaultTimeout = 10 * time.Second
