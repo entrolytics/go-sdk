@@ -61,6 +61,10 @@ const (
 
 	// sessionWindow is the length of a derived session.
 	sessionWindow = 30 * time.Minute
+
+	// visitorIdScope values: how long a visitor id identifies the same visitor.
+	visitorScopeDaily      = "daily"
+	visitorScopePersistent = "persistent"
 )
 
 // Client is the Entrolytics API client.
@@ -168,7 +172,7 @@ func (c *Client) eventPayload(event *Event) (collectPayload, error) {
 	if at.IsZero() {
 		at = time.Now()
 	}
-	sessionID, visitorID := c.visitorIDs(event.WebsiteID, event.SessionID, event.VisitorID, event.IPAddress, event.UserAgent, at)
+	sessionID, visitorID, visitorScope := c.visitorIDs(event.WebsiteID, event.SessionID, event.VisitorID, event.IPAddress, event.UserAgent, at)
 
 	properties := map[string]interface{}{}
 	for key, value := range event.Data {
@@ -179,16 +183,17 @@ func (c *Client) eventPayload(event *Event) (collectPayload, error) {
 	}
 
 	return collectPayload{
-		WebsiteID:  event.WebsiteID,
-		EventID:    generateUUID(),
-		Timestamp:  eventTime(at),
-		SessionID:  sessionID,
-		VisitorID:  visitorID,
-		URL:        normalizeURL(c.host, event.URL),
-		EventType:  "custom_event",
-		EventName:  event.Name,
-		Referrer:   normalizeReferrer(event.Referrer),
-		Properties: properties,
+		WebsiteID:      event.WebsiteID,
+		EventID:        generateUUID(),
+		Timestamp:      eventTime(at),
+		SessionID:      sessionID,
+		VisitorID:      visitorID,
+		VisitorIDScope: visitorScope,
+		URL:            normalizeURL(c.host, event.URL),
+		EventType:      "custom_event",
+		EventName:      event.Name,
+		Referrer:       normalizeReferrer(event.Referrer),
+		Properties:     properties,
 	}, nil
 }
 
@@ -213,7 +218,7 @@ func (c *Client) PageViewWithContext(ctx context.Context, pv PageView) error {
 	if at.IsZero() {
 		at = time.Now()
 	}
-	sessionID, visitorID := c.visitorIDs(pv.WebsiteID, pv.SessionID, pv.VisitorID, pv.IPAddress, pv.UserAgent, at)
+	sessionID, visitorID, visitorScope := c.visitorIDs(pv.WebsiteID, pv.SessionID, pv.VisitorID, pv.IPAddress, pv.UserAgent, at)
 
 	properties := map[string]interface{}{}
 	if pv.Title != "" {
@@ -224,15 +229,16 @@ func (c *Client) PageViewWithContext(ctx context.Context, pv PageView) error {
 	}
 
 	payload := collectPayload{
-		WebsiteID:  pv.WebsiteID,
-		EventID:    generateUUID(),
-		Timestamp:  eventTime(at),
-		SessionID:  sessionID,
-		VisitorID:  visitorID,
-		URL:        normalizeURL(c.host, pv.URL),
-		EventType:  "pageview",
-		Referrer:   normalizeReferrer(pv.Referrer),
-		Properties: properties,
+		WebsiteID:      pv.WebsiteID,
+		EventID:        generateUUID(),
+		Timestamp:      eventTime(at),
+		SessionID:      sessionID,
+		VisitorID:      visitorID,
+		VisitorIDScope: visitorScope,
+		URL:            normalizeURL(c.host, pv.URL),
+		EventType:      "pageview",
+		Referrer:       normalizeReferrer(pv.Referrer),
+		Properties:     properties,
 	}
 
 	return c.send(ctx, payload, pv.UserAgent, pv.IPAddress)
@@ -260,9 +266,9 @@ func (c *Client) IdentifyWithContext(ctx context.Context, id Identify) error {
 		sessionID = generateUUID()
 	}
 
-	visitorID := id.VisitorID
+	visitorID, visitorScope := id.VisitorID, visitorScopePersistent
 	if visitorID == "" {
-		visitorID = generateUUID()
+		visitorID, visitorScope = generateUUID(), ""
 	}
 
 	properties := map[string]interface{}{}
@@ -273,15 +279,16 @@ func (c *Client) IdentifyWithContext(ctx context.Context, id Identify) error {
 	properties["identify"] = true
 
 	payload := collectPayload{
-		WebsiteID:  id.WebsiteID,
-		EventID:    generateUUID(),
-		Timestamp:  eventTime(id.Timestamp),
-		SessionID:  sessionID,
-		VisitorID:  visitorID,
-		URL:        normalizeURL(c.host, "/identify"),
-		EventType:  "custom_event",
-		EventName:  "identify",
-		Properties: properties,
+		WebsiteID:      id.WebsiteID,
+		EventID:        generateUUID(),
+		Timestamp:      eventTime(id.Timestamp),
+		SessionID:      sessionID,
+		VisitorID:      visitorID,
+		VisitorIDScope: visitorScope,
+		URL:            normalizeURL(c.host, "/identify"),
+		EventType:      "custom_event",
+		EventName:      "identify",
+		Properties:     properties,
 	}
 
 	return c.send(ctx, payload, "", "")
@@ -425,23 +432,30 @@ func eventTime(value time.Time) string {
 // visitorIDs returns the session and visitor ids for an event at the given time: the caller's,
 // else ones derived from the visitor's IP address and user agent, else new random ones when
 // neither is known.
-func (c *Client) visitorIDs(websiteID, sessionID, visitorID, ipAddress, userAgent string, at time.Time) (string, string) {
+//
+// It also returns the visitor id's visitorIdScope, how long it identifies the visitor; the API's
+// retention report counts only persistent ids. The caller's id is persistent, a derived id rotates
+// daily, and a random id has no defined lifetime, so its scope is empty and left out.
+func (c *Client) visitorIDs(websiteID, sessionID, visitorID, ipAddress, userAgent string, at time.Time) (session, visitor, visitorScope string) {
 	known := ipAddress != "" || userAgent != ""
-	if sessionID == "" {
+	session, visitor = sessionID, visitorID
+	if session == "" {
 		if known {
-			sessionID = deriveSessionID(c.apiKey, websiteID, ipAddress, userAgent, at)
+			session = deriveSessionID(c.apiKey, websiteID, ipAddress, userAgent, at)
 		} else {
-			sessionID = generateUUID()
+			session = generateUUID()
 		}
 	}
-	if visitorID == "" {
-		if known {
-			visitorID = deriveVisitorID(c.apiKey, websiteID, ipAddress, userAgent, at)
-		} else {
-			visitorID = generateUUID()
-		}
+	switch {
+	case visitor != "":
+		visitorScope = visitorScopePersistent
+	case known:
+		visitor = deriveVisitorID(c.apiKey, websiteID, ipAddress, userAgent, at)
+		visitorScope = visitorScopeDaily
+	default:
+		visitor = generateUUID()
 	}
-	return sessionID, visitorID
+	return session, visitor, visitorScope
 }
 
 // deriveVisitorID returns a site-scoped visitor id that rotates at midnight UTC, derived from the

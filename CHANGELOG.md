@@ -15,3 +15,8 @@
   submission, is now `Batch` / `BatchWithContext`, which send up to 100 custom events in one
   request to `/collect/batch` in the canonical payload shape; the events of a batch must share one
   `IPAddress` and `UserAgent`, since the API resolves geo data and screens bots per request.
+- `/collect` events did not say how long their `visitorId` identifies the visitor, so the API's
+  retention report, which counts only persistent visitor ids, could not use any server-side
+  traffic. `Track`, `PageView`, `Identify` and `Batch` now send `visitorIdScope`: `persistent` for
+  a caller-supplied `VisitorID`, `daily` for the id derived from `IPAddress` and `UserAgent`; it
+  is left out for a random id.

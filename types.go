@@ -116,16 +116,17 @@ type ClientOptions struct {
 
 // collectPayload is the canonical payload for /collect ingestion.
 type collectPayload struct {
-	WebsiteID  string                 `json:"websiteId"`
-	EventID    string                 `json:"eventId"`
-	Timestamp  string                 `json:"timestamp"`
-	SessionID  string                 `json:"sessionId"`
-	VisitorID  string                 `json:"visitorId"`
-	URL        string                 `json:"url"`
-	EventType  string                 `json:"eventType"`
-	EventName  string                 `json:"eventName,omitempty"`
-	Referrer   string                 `json:"referrer,omitempty"`
-	Properties map[string]interface{} `json:"properties,omitempty"`
+	WebsiteID      string                 `json:"websiteId"`
+	EventID        string                 `json:"eventId"`
+	Timestamp      string                 `json:"timestamp"`
+	SessionID      string                 `json:"sessionId"`
+	VisitorID      string                 `json:"visitorId"`
+	VisitorIDScope string                 `json:"visitorIdScope,omitempty"`
+	URL            string                 `json:"url"`
+	EventType      string                 `json:"eventType"`
+	EventName      string                 `json:"eventName,omitempty"`
+	Referrer       string                 `json:"referrer,omitempty"`
+	Properties     map[string]interface{} `json:"properties,omitempty"`
 }
 
 // batchPayload is the body of a /collect/batch request.

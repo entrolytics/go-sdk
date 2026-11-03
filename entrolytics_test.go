@@ -150,7 +150,7 @@ func TestBatchSendsTheEventsOfOneVisitorInOneRequest(t *testing.T) {
 		t.Errorf("events share the event id %s", events[0].EventID)
 	}
 	for i, payload := range events {
-		if payload.SessionID != firstSessionVector || payload.VisitorID != visitorVector || payload.EventType != "custom_event" {
+		if payload.SessionID != firstSessionVector || payload.VisitorID != visitorVector || payload.VisitorIDScope != "daily" || payload.EventType != "custom_event" {
 			t.Errorf("event %d = %+v", i, payload)
 		}
 	}
@@ -168,5 +168,54 @@ func TestBatchRejectsInvalidEventsAndMixedVisitors(t *testing.T) {
 	}
 	if len(*payloads) != 0 {
 		t.Errorf("sent %d requests for invalid batches, want 0", len(*payloads))
+	}
+}
+
+func TestEventsDeclareHowLongTheVisitorIDLasts(t *testing.T) {
+	client, payloads := collect(t)
+	derived := Event{WebsiteID: testWebsiteID, Name: "signup", IPAddress: testIP, UserAgent: testUserAgent}
+
+	steps := []func() error{
+		func() error { return client.Track(derived) },
+		func() error {
+			return client.PageView(PageView{WebsiteID: testWebsiteID, URL: "/pricing", UserAgent: testUserAgent})
+		},
+		func() error {
+			return client.Track(Event{WebsiteID: testWebsiteID, Name: "signup", VisitorID: "customer-42", IPAddress: testIP})
+		},
+		func() error {
+			return client.Identify(Identify{WebsiteID: testWebsiteID, UserID: "user-1", VisitorID: "customer-42"})
+		},
+		func() error { return client.Track(Event{WebsiteID: testWebsiteID, Name: "signup"}) },
+		func() error { return client.Identify(Identify{WebsiteID: testWebsiteID, UserID: "user-1"}) },
+	}
+	for _, step := range steps {
+		if err := step(); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	want := []string{"daily", "daily", "persistent", "persistent", "", ""}
+	if len(*payloads) != len(want) {
+		t.Fatalf("received %d events, want %d", len(*payloads), len(want))
+	}
+	for i, payload := range *payloads {
+		if payload.VisitorIDScope != want[i] {
+			t.Errorf("event %d visitorIdScope = %q, want %q", i, payload.VisitorIDScope, want[i])
+		}
+	}
+}
+
+func TestAnUnknownVisitorIDScopeIsLeftOut(t *testing.T) {
+	body, err := json.Marshal(collectPayload{VisitorID: "visitor"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fields map[string]interface{}
+	if err := json.Unmarshal(body, &fields); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := fields["visitorIdScope"]; ok {
+		t.Errorf("payload carries visitorIdScope without a scope: %s", body)
 	}
 }
