@@ -37,7 +37,9 @@ package entrolytics
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -56,6 +58,9 @@ const (
 
 	// Version is the SDK version.
 	Version = "2.1.0"
+
+	// sessionWindow is the length of a derived session.
+	sessionWindow = 30 * time.Minute
 )
 
 // Client is the Entrolytics API client.
@@ -114,15 +119,11 @@ func (c *Client) TrackWithContext(ctx context.Context, event Event) error {
 		return ErrEventNameRequired
 	}
 
-	sessionID := event.SessionID
-	if sessionID == "" {
-		sessionID = generateUUID()
+	at := event.Timestamp
+	if at.IsZero() {
+		at = time.Now()
 	}
-
-	visitorID := event.VisitorID
-	if visitorID == "" {
-		visitorID = generateUUID()
-	}
+	sessionID, visitorID := c.visitorIDs(event.WebsiteID, event.SessionID, event.VisitorID, event.IPAddress, event.UserAgent, at)
 
 	properties := map[string]interface{}{}
 	for key, value := range event.Data {
@@ -135,7 +136,7 @@ func (c *Client) TrackWithContext(ctx context.Context, event Event) error {
 	payload := collectPayload{
 		WebsiteID:  event.WebsiteID,
 		EventID:    generateUUID(),
-		Timestamp:  eventTime(event.Timestamp),
+		Timestamp:  eventTime(at),
 		SessionID:  sessionID,
 		VisitorID:  visitorID,
 		URL:        normalizeURL(c.host, event.URL),
@@ -165,15 +166,11 @@ func (c *Client) PageViewWithContext(ctx context.Context, pv PageView) error {
 		return ErrURLRequired
 	}
 
-	sessionID := pv.SessionID
-	if sessionID == "" {
-		sessionID = generateUUID()
+	at := pv.Timestamp
+	if at.IsZero() {
+		at = time.Now()
 	}
-
-	visitorID := pv.VisitorID
-	if visitorID == "" {
-		visitorID = generateUUID()
-	}
+	sessionID, visitorID := c.visitorIDs(pv.WebsiteID, pv.SessionID, pv.VisitorID, pv.IPAddress, pv.UserAgent, at)
 
 	properties := map[string]interface{}{}
 	if pv.Title != "" {
@@ -186,7 +183,7 @@ func (c *Client) PageViewWithContext(ctx context.Context, pv PageView) error {
 	payload := collectPayload{
 		WebsiteID:  pv.WebsiteID,
 		EventID:    generateUUID(),
-		Timestamp:  eventTime(pv.Timestamp),
+		Timestamp:  eventTime(at),
 		SessionID:  sessionID,
 		VisitorID:  visitorID,
 		URL:        normalizeURL(c.host, pv.URL),
@@ -382,12 +379,65 @@ func eventTime(value time.Time) string {
 	return value.UTC().Format(time.RFC3339Nano)
 }
 
+// visitorIDs returns the session and visitor ids for an event at the given time: the caller's,
+// else ones derived from the visitor's IP address and user agent, else new random ones when
+// neither is known.
+func (c *Client) visitorIDs(websiteID, sessionID, visitorID, ipAddress, userAgent string, at time.Time) (string, string) {
+	known := ipAddress != "" || userAgent != ""
+	if sessionID == "" {
+		if known {
+			sessionID = deriveSessionID(c.apiKey, websiteID, ipAddress, userAgent, at)
+		} else {
+			sessionID = generateUUID()
+		}
+	}
+	if visitorID == "" {
+		if known {
+			visitorID = deriveVisitorID(c.apiKey, websiteID, ipAddress, userAgent, at)
+		} else {
+			visitorID = generateUUID()
+		}
+	}
+	return sessionID, visitorID
+}
+
+// deriveVisitorID returns a site-scoped visitor id that rotates at midnight UTC, derived from the
+// visitor's IP address and user agent. A new id per call counted every server-side event as a new
+// visitor. The API identifies browser visitors the same way, with a daily keyed hash and no
+// cookie; the key is the API key, so the id cannot be recomputed from an IP address and user
+// agent alone.
+func deriveVisitorID(apiKey, websiteID, ipAddress, userAgent string, at time.Time) string {
+	day := at.UTC().Format("2006-01-02")
+	return hmacUUID(apiKey, websiteID+"\x00"+day+"\x00"+ipAddress+"\x00"+userAgent)
+}
+
+// deriveSessionID returns a session id for the visitor's 30-minute UTC window (starting on the
+// hour and the half hour), derived like the visitor id from the IP address and user agent, with
+// no cookie. A new id per call counted every server-side event as a new visit. A visit that
+// crosses a window boundary counts as two sessions.
+func deriveSessionID(apiKey, websiteID, ipAddress, userAgent string, at time.Time) string {
+	slot := at.UTC().Truncate(sessionWindow).Format("2006-01-02T15:04")
+	return hmacUUID(apiKey, websiteID+"\x00session\x00"+slot+"\x00"+ipAddress+"\x00"+userAgent)
+}
+
+// hmacUUID formats the first 16 bytes of HMAC-SHA256(key, message) as a version 4 UUID.
+func hmacUUID(key, message string) string {
+	mac := hmac.New(sha256.New, []byte(key))
+	mac.Write([]byte(message))
+	return formatUUIDv4(mac.Sum(nil)[:16])
+}
+
 func generateUUID() string {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
 		return fmt.Sprintf("00000000-0000-4000-8000-%012x", time.Now().UnixNano()&0xFFFFFFFFFFFF)
 	}
 
+	return formatUUIDv4(b)
+}
+
+// formatUUIDv4 sets the version 4 and RFC 4122 variant bits on 16 bytes and formats them.
+func formatUUIDv4(b []byte) string {
 	b[6] = (b[6] & 0x0f) | 0x40
 	b[8] = (b[8] & 0x3f) | 0x80
 
