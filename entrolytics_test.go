@@ -108,3 +108,65 @@ func TestExplicitIDsWinAndUnknownVisitorsGetNewIDs(t *testing.T) {
 		t.Errorf("events without visitor context shared ids: %+v %+v", first, second)
 	}
 }
+
+func TestBatchSendsTheEventsOfOneVisitorInOneRequest(t *testing.T) {
+	var requests []*http.Request
+	var bodies []batchPayload
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body batchPayload
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("decode batch: %v", err)
+		}
+		requests = append(requests, r)
+		bodies = append(bodies, body)
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	t.Cleanup(server.Close)
+	client := NewClientWithOptions(ClientOptions{APIKey: testAPIKey, Host: server.URL})
+	when := at(t, "2026-09-24T14:47:00Z")
+	event := Event{WebsiteID: testWebsiteID, Name: "signup", IPAddress: testIP, UserAgent: testUserAgent, Timestamp: when}
+
+	if err := client.Batch(nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Batch([]Event{event, {WebsiteID: testWebsiteID, Name: "upgrade", IPAddress: testIP, UserAgent: testUserAgent, Timestamp: when}}); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(requests) != 1 {
+		t.Fatalf("sent %d requests, want 1", len(requests))
+	}
+	request, events := requests[0], bodies[0].Events
+	if request.URL.Path != "/collect/batch" || request.Header.Get("x-api-key") != testAPIKey {
+		t.Errorf("request = %s with key %q", request.URL.Path, request.Header.Get("x-api-key"))
+	}
+	if request.Header.Get("X-Forwarded-For") != testIP || request.Header.Get("X-Forwarded-User-Agent") != testUserAgent {
+		t.Errorf("forwarded visitor = %q/%q", request.Header.Get("X-Forwarded-For"), request.Header.Get("X-Forwarded-User-Agent"))
+	}
+	if len(events) != 2 || events[0].EventName != "signup" || events[1].EventName != "upgrade" {
+		t.Fatalf("events = %+v", events)
+	}
+	if events[0].EventID == events[1].EventID {
+		t.Errorf("events share the event id %s", events[0].EventID)
+	}
+	for i, payload := range events {
+		if payload.SessionID != firstSessionVector || payload.VisitorID != visitorVector || payload.EventType != "custom_event" {
+			t.Errorf("event %d = %+v", i, payload)
+		}
+	}
+}
+
+func TestBatchRejectsInvalidEventsAndMixedVisitors(t *testing.T) {
+	client, payloads := collect(t)
+	event := Event{WebsiteID: testWebsiteID, Name: "signup", IPAddress: testIP, UserAgent: testUserAgent}
+
+	if err := client.Batch([]Event{event, {WebsiteID: testWebsiteID, Name: "signup", IPAddress: "198.51.100.4", UserAgent: testUserAgent}}); err != ErrBatchVisitorMismatch {
+		t.Errorf("mixed visitors: err = %v, want ErrBatchVisitorMismatch", err)
+	}
+	if err := client.Batch([]Event{event, {WebsiteID: testWebsiteID, IPAddress: testIP, UserAgent: testUserAgent}}); err != ErrEventNameRequired {
+		t.Errorf("unnamed event: err = %v, want ErrEventNameRequired", err)
+	}
+	if len(*payloads) != 0 {
+		t.Errorf("sent %d requests for invalid batches, want 0", len(*payloads))
+	}
+}

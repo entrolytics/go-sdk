@@ -112,11 +112,56 @@ func (c *Client) TrackWithContext(ctx context.Context, event Event) error {
 	if c.apiKey == "" {
 		return ErrAPIKeyRequired
 	}
+	payload, err := c.eventPayload(&event)
+	if err != nil {
+		return err
+	}
+
+	return c.send(ctx, payload, event.UserAgent, event.IPAddress)
+}
+
+// Batch sends up to 100 custom events to Entrolytics in one request.
+//
+// The API resolves geo data and screens bots once per request, from the forwarded IP address and
+// user agent, so every event in a batch must carry the same IPAddress and UserAgent: one visitor's
+// events, or server events with neither.
+func (c *Client) Batch(events []Event) error {
+	return c.BatchWithContext(context.Background(), events)
+}
+
+// BatchWithContext sends up to 100 custom events in one request with context for cancellation.
+func (c *Client) BatchWithContext(ctx context.Context, events []Event) error {
+	if c.apiKey == "" {
+		return ErrAPIKeyRequired
+	}
+	if len(events) == 0 {
+		return nil
+	}
+
+	visitor := &events[0]
+	payloads := make([]collectPayload, 0, len(events))
+	for i := range events {
+		event := &events[i]
+		if event.IPAddress != visitor.IPAddress || event.UserAgent != visitor.UserAgent {
+			return ErrBatchVisitorMismatch
+		}
+		payload, err := c.eventPayload(event)
+		if err != nil {
+			return err
+		}
+		payloads = append(payloads, payload)
+	}
+
+	return c.sendToEndpoint(ctx, "/collect/batch", batchPayload{Events: payloads}, visitor.UserAgent, visitor.IPAddress)
+}
+
+// eventPayload validates a custom event and builds its /collect payload.
+func (c *Client) eventPayload(event *Event) (collectPayload, error) {
 	if event.WebsiteID == "" {
-		return ErrWebsiteIDRequired
+		return collectPayload{}, ErrWebsiteIDRequired
 	}
 	if event.Name == "" {
-		return ErrEventNameRequired
+		return collectPayload{}, ErrEventNameRequired
 	}
 
 	at := event.Timestamp
@@ -133,7 +178,7 @@ func (c *Client) TrackWithContext(ctx context.Context, event Event) error {
 		properties["distinctId"] = event.UserID
 	}
 
-	payload := collectPayload{
+	return collectPayload{
 		WebsiteID:  event.WebsiteID,
 		EventID:    generateUUID(),
 		Timestamp:  eventTime(at),
@@ -144,9 +189,7 @@ func (c *Client) TrackWithContext(ctx context.Context, event Event) error {
 		EventName:  event.Name,
 		Referrer:   normalizeReferrer(event.Referrer),
 		Properties: properties,
-	}
-
-	return c.send(ctx, payload, event.UserAgent, event.IPAddress)
+	}, nil
 }
 
 // PageView sends a page view event to Entrolytics.

@@ -150,7 +150,8 @@ Used by `Track`, `PageView`, and `Identify`.
 
 ### `/collect/batch` - Batch Ingestion
 
-Available in the lightweight batch client (`client.go`) for high-volume event submission.
+Used by `Batch`, which sends up to 100 custom events in one request. The API resolves geo data and
+screens bots once per request, so the events of a batch must share one `IPAddress` and `UserAgent`.
 
 ### `/api/collect/vitals` and `/api/collect/forms` - Phase 2 Telemetry
 

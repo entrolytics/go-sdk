@@ -34,6 +34,13 @@ var (
 		Message: "user ID is required",
 	}
 
+	// ErrBatchVisitorMismatch is returned when the events of a batch carry different IP addresses
+	// or user agents.
+	ErrBatchVisitorMismatch = &EntrolyticsError{
+		Code:    "batch_visitor_mismatch",
+		Message: "every event in a batch must have the same IP address and user agent",
+	}
+
 	// Phase 2: Web Vitals errors
 	// ErrVitalMetricRequired is returned when the vital metric type is missing.
 	ErrVitalMetricRequired = &EntrolyticsError{

@@ -128,6 +128,11 @@ type collectPayload struct {
 	Properties map[string]interface{} `json:"properties,omitempty"`
 }
 
+// batchPayload is the body of a /collect/batch request.
+type batchPayload struct {
+	Events []collectPayload `json:"events"`
+}
+
 // ============================================================================
 // Phase 2: Web Vitals Types
 // ============================================================================
