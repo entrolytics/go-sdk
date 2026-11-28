@@ -223,6 +223,8 @@ type WebVital struct {
 
 type vitalPayload struct {
 	WebsiteID   string      `json:"websiteId"`
+	EventID     string      `json:"eventId"`
+	Timestamp   string      `json:"timestamp"`
 	VisitorID   string      `json:"visitorId"`
 	SessionID   string      `json:"sessionId"`
 	URL         string      `json:"url"`

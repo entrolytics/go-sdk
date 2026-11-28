@@ -4,6 +4,9 @@
 
 ### Fixed
 
+- `TrackVital` sent no `eventId` and no `timestamp`, both required by `/api/collect/vitals`, so
+  the API rejected every Web Vital with HTTP 400. Each call now sends a new `eventId` and the
+  vital's `Timestamp` (now, when it is zero) in RFC 3339.
 - `Track` and `PageView` generated a new session id and visitor id per call, so every server-side
   event counted as a new visitor and a new visit. When `IPAddress` or `UserAgent` is given, as the
   HTTP middleware does, the visitor id is now derived from them per UTC day and the session id per

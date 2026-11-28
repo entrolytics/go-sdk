@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"regexp"
 	"testing"
 	"time"
 )
@@ -217,5 +219,75 @@ func TestAnUnknownVisitorIDScopeIsLeftOut(t *testing.T) {
 	}
 	if _, ok := fields["visitorIdScope"]; ok {
 		t.Errorf("payload carries visitorIdScope without a scope: %s", body)
+	}
+}
+
+func TestTrackVitalSendsTheFieldsTheAPIRequires(t *testing.T) {
+	var path string
+	var fields map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path = r.URL.Path
+		if err := json.NewDecoder(r.Body).Decode(&fields); err != nil {
+			t.Errorf("decode payload: %v", err)
+		}
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	t.Cleanup(server.Close)
+	client := NewClientWithOptions(ClientOptions{APIKey: testAPIKey, Host: server.URL})
+
+	if err := client.TrackVital(WebVital{WebsiteID: testWebsiteID, Metric: LCP, Value: 1234.5, Rating: Good, Path: "/pricing"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if path != "/api/collect/vitals" {
+		t.Errorf("request path = %s, want /api/collect/vitals", path)
+	}
+	uuidPattern := regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
+	for _, field := range []string{"websiteId", "eventId", "sessionId", "visitorId"} {
+		if value, _ := fields[field].(string); !uuidPattern.MatchString(value) {
+			t.Errorf("%s = %v, want a UUID", field, fields[field])
+		}
+	}
+	timestamp, _ := fields["timestamp"].(string)
+	if _, err := time.Parse(time.RFC3339, timestamp); err != nil {
+		t.Errorf("timestamp = %v, want RFC 3339: %v", fields["timestamp"], err)
+	}
+	rawURL, _ := fields["url"].(string)
+	if parsed, err := url.Parse(rawURL); err != nil || !parsed.IsAbs() || parsed.Host == "" {
+		t.Errorf("url = %v, want an absolute URL", fields["url"])
+	}
+	if fields["path"] != "/pricing" || fields["metricName"] != "LCP" || fields["metricValue"] != 1234.5 {
+		t.Errorf("path, metricName, metricValue = %v, %v, %v", fields["path"], fields["metricName"], fields["metricValue"])
+	}
+}
+
+func TestTrackVitalKeepsTheRecordedTimeAndNewEventIDs(t *testing.T) {
+	var fields []map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]interface{}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("decode payload: %v", err)
+		}
+		fields = append(fields, body)
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	t.Cleanup(server.Close)
+	client := NewClientWithOptions(ClientOptions{APIKey: testAPIKey, Host: server.URL})
+	vital := WebVital{WebsiteID: testWebsiteID, Metric: CLS, Value: 0.1, Rating: Good, Timestamp: at(t, "2026-09-24T14:30:00Z")}
+
+	for range 2 {
+		if err := client.TrackVital(vital); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if len(fields) != 2 {
+		t.Fatalf("received %d vitals, want 2", len(fields))
+	}
+	if fields[0]["timestamp"] != "2026-09-24T14:30:00Z" {
+		t.Errorf("timestamp = %v, want 2026-09-24T14:30:00Z", fields[0]["timestamp"])
+	}
+	if fields[0]["eventId"] == fields[1]["eventId"] {
+		t.Errorf("both vitals carry eventId %v, want one per report", fields[0]["eventId"])
 	}
 }

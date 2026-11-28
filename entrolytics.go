@@ -321,6 +321,8 @@ func (c *Client) TrackVitalWithContext(ctx context.Context, vital WebVital) erro
 
 	payload := vitalPayload{
 		WebsiteID:   vital.WebsiteID,
+		EventID:     generateUUID(),
+		Timestamp:   eventTime(vital.Timestamp),
 		VisitorID:   firstNonEmpty(vital.VisitorID, generateUUID()),
 		SessionID:   firstNonEmpty(vital.SessionID, generateUUID()),
 		URL:         normalizeURL(c.host, firstNonEmpty(vital.URL, "/vital")),
